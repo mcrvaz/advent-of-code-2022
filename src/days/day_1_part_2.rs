@@ -1,7 +1,7 @@
 use std::fs::read_to_string;
 
 pub fn solve() {
-    const PATH: &str = "src/days/test-input.txt";
+    const PATH: &str = "src/days/input.txt";
     const GROUP_COUNT: usize = 3;
     let content = read_to_string(PATH).expect("Fail to read file.");
     let max = get_max_calories(&content, GROUP_COUNT);
