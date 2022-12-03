@@ -18,8 +18,7 @@ enum MatchResult {
     Defeat = 0,
 }
 
-impl MatchResult
-{
+impl MatchResult {
     fn from_char(input: char) -> MatchResult {
         match input {
             'X' => MatchResult::Defeat,
@@ -85,7 +84,7 @@ fn get_shape_to_match_result(opponent_in: Shape, target_result: MatchResult) -> 
 
 fn get_match_value(player_in: Shape, opponent_in: Shape) -> i32 {
     if player_in == opponent_in {
-        return MatchResult::Draw as i32
+        return MatchResult::Draw as i32;
     }
 
     let won = match player_in {
@@ -106,9 +105,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_case() {
+    fn sample() {
         const PATH: &str = "src/days/day2/test-input.txt";
         const EXPECTED: i32 = 12;
+        let result = internal_solve(PATH);
+        assert_eq!(result, EXPECTED);
+    }
+
+    #[test]
+    fn result() {
+        const PATH: &str = "src/days/day2/input.txt";
+        const EXPECTED: i32 = 14859;
         let result = internal_solve(PATH);
         assert_eq!(result, EXPECTED);
     }

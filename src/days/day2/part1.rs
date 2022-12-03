@@ -67,9 +67,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_case() {
+    fn sample() {
         const PATH: &str = "src/days/day2/test-input.txt";
         const EXPECTED: i32 = 15;
+        let result = internal_solve(PATH);
+        assert_eq!(result, EXPECTED);
+    }
+
+    #[test]
+    fn result() {
+        const PATH: &str = "src/days/day2/input.txt";
+        const EXPECTED: i32 = 10310;
         let result = internal_solve(PATH);
         assert_eq!(result, EXPECTED);
     }
