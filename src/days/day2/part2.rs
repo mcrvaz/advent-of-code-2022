@@ -7,9 +7,9 @@ pub fn solve() {
 
 #[derive(PartialEq, Clone, Copy)]
 enum Shape {
-    Rock,
-    Paper,
-    Scissors,
+    Rock = 1,
+    Paper = 2,
+    Scissors = 3,
 }
 
 enum MatchResult {
@@ -55,14 +55,6 @@ impl Shape {
             Shape::Scissors => Shape::Paper,
         }
     }
-
-    fn get_value(self) -> i32 {
-        match self {
-            Shape::Rock => 1,
-            Shape::Paper => 2,
-            Shape::Scissors => 3,
-        }
-    }
 }
 
 fn internal_solve(path: &str) -> i32 {
@@ -78,7 +70,7 @@ fn internal_solve(path: &str) -> i32 {
 }
 
 fn get_round_result(player_in: Shape, opponent_in: Shape) -> i32 {
-    let shape_value = player_in.get_value();
+    let shape_value = player_in as i32;
     let match_value = get_match_value(player_in, opponent_in);
     shape_value + match_value
 }
