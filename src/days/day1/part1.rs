@@ -1,10 +1,13 @@
 use std::fs::read_to_string;
 
 pub fn solve() {
-    const PATH: &str = "src/days/input.txt";
-    let content = read_to_string(PATH).expect("Fail to read file.");
-    let max = get_max_calories(&content);
-    println!("Result: {}", max);
+    let result = internal_solve("src/days/day1/input.txt");
+    println!("Result: {}", result);
+}
+
+fn internal_solve(path: &str) -> i32 {
+    let content = read_to_string(path).expect("Fail to read file.");
+    get_max_calories(&content)
 }
 
 fn get_max_calories(content: &str) -> i32 {
@@ -26,4 +29,17 @@ fn get_max_calories(content: &str) -> i32 {
     }
 
     max
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_case() {
+        const PATH: &str = "src/days/day1/test-input.txt";
+        const EXPECTED: i32 = 24000;
+        let result = internal_solve(PATH);
+        assert_eq!(result, EXPECTED);
+    }
 }

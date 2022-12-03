@@ -1,11 +1,14 @@
 use std::fs::read_to_string;
 
 pub fn solve() {
-    const PATH: &str = "src/days/input.txt";
+    let result = internal_solve("src/days/day1/input.txt");
+    println!("Result: {}", result);
+}
+
+fn internal_solve(path: &str) -> i32 {
     const GROUP_COUNT: usize = 3;
-    let content = read_to_string(PATH).expect("Fail to read file.");
-    let max = get_max_calories(&content, GROUP_COUNT);
-    println!("Result: {}", max);
+    let content = read_to_string(path).expect("Fail to read file.");
+    get_max_calories(&content, GROUP_COUNT)
 }
 
 fn get_max_calories(content: &str, group_count: usize) -> i32 {
@@ -38,5 +41,18 @@ fn try_replace_smaller_value(element: i32, vec: &mut Vec<i32>) {
             vec[i] = element;
             return;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_case() {
+        const PATH: &str = "src/days/day1/test-input.txt";
+        const EXPECTED: i32 = 45000;
+        let result = internal_solve(PATH);
+        assert_eq!(result, EXPECTED);
     }
 }
