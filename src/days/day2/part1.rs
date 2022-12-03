@@ -12,38 +12,40 @@ enum Shape {
     Scissors,
 }
 
+impl Shape {
+    fn from_char(input: char) -> Shape {
+        match input {
+            'A' | 'X' => Shape::Rock,
+            'B' | 'Y' => Shape::Paper,
+            'C' | 'Z' => Shape::Scissors,
+            _ => panic!("Invalid shape input."),
+        }
+    }
+
+    fn get_value(self) -> i32 {
+        match self {
+            Shape::Rock => 1,
+            Shape::Paper => 2,
+            Shape::Scissors => 3,
+        }
+    }
+}
+
 fn internal_solve(path: &str) -> i32 {
     let content = read_to_string(path).expect("Fail to read file.");
     let mut score = 0;
     for line in content.lines() {
-        let opponent = get_shape(line.chars().nth(0).unwrap());
-        let player = get_shape(line.chars().nth(2).unwrap());
+        let opponent = Shape::from_char(line.chars().nth(0).unwrap());
+        let player = Shape::from_char(line.chars().nth(2).unwrap());
         score += get_round_result(player, opponent);
     }
     score
 }
 
-fn get_shape(input: char) -> Shape {
-    match input {
-        'A' | 'X' => Shape::Rock,
-        'B' | 'Y' => Shape::Paper,
-        'C' | 'Z' => Shape::Scissors,
-        _ => panic!("Invalid shape input."),
-    }
-}
-
 fn get_round_result(player_in: Shape, opponent_in: Shape) -> i32 {
-    let shape_value = get_shape_value(player_in);
+    let shape_value = player_in.get_value();
     let match_value = get_match_value(player_in, opponent_in);
     shape_value + match_value
-}
-
-fn get_shape_value(input: Shape) -> i32 {
-    match input {
-        Shape::Rock => 1,
-        Shape::Paper => 2,
-        Shape::Scissors => 3,
-    }
 }
 
 fn get_match_value(player_in: Shape, opponent_in: Shape) -> i32 {
