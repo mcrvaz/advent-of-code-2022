@@ -1,3 +1,7 @@
-// {
+{
+    "cSpell.words": [
+        "compart"
+    ]
+} // {
 //     "rust-analyzer.runnables.extraArgs": ["1", "2"]
 // }
