@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
-        "compart"
+        "compart",
+        "Deque"
     ]
 } // {
 //     "rust-analyzer.runnables.extraArgs": ["1", "2"]
