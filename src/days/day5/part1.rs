@@ -1,6 +1,6 @@
 use regex::Regex;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeMap, VecDeque},
     fmt,
     fs::read_to_string,
     str::Lines,
@@ -23,7 +23,7 @@ impl fmt::Debug for Instruction {
     }
 }
 
-fn internal_solve(path: &str) -> &str {
+fn internal_solve(path: &str) -> String {
     let content = read_to_string(path).expect("Fail to read file.");
     let mut line_iter = content.lines();
     let mut stacks = parse_stacks(&mut line_iter);
@@ -31,19 +31,19 @@ fn internal_solve(path: &str) -> &str {
     for inst in instructions {
         execute_instruction(&mut stacks, inst)
     }
-    // let result: String = stacks
-    //     .values()
-    //     .map(|x| x.clone().pop_back().unwrap())
-    //     .collect();
-    ""
+
+    stacks
+        .values()
+        .map(|x| x.clone().pop_back().unwrap())
+        .collect::<String>()
 }
 
-fn parse_stacks(line_iter: &mut Lines) -> HashMap<usize, VecDeque<char>> {
+fn parse_stacks(line_iter: &mut Lines) -> BTreeMap<usize, VecDeque<char>> {
     const SPACING: usize = 1;
     const ELEMENT_SIZE: usize = 3;
     const RADIX: u32 = 10;
 
-    let mut result: HashMap<usize, VecDeque<char>> = HashMap::new();
+    let mut result: BTreeMap<usize, VecDeque<char>> = BTreeMap::new();
 
     loop {
         if let Some(line) = line_iter.next() {
@@ -90,10 +90,10 @@ fn parse_instruction(line: &str) -> Instruction {
     }
 }
 
-fn execute_instruction(stacks: &mut HashMap<usize, VecDeque<char>>, inst: Instruction) {
-    for i in 0..inst.count {
-        let value = stacks[&inst.orig].pop_back().unwrap();
-        stacks[&inst.dst].push_back(value);
+fn execute_instruction(stacks: &mut BTreeMap<usize, VecDeque<char>>, inst: Instruction) {
+    for _ in 0..inst.count {
+        let value = stacks.get_mut(&inst.orig).unwrap().pop_back().unwrap();
+        stacks.get_mut(&inst.dst).unwrap().push_back(value);
     }
 }
 
@@ -109,11 +109,11 @@ mod tests {
         assert_eq!(result, EXPECTED);
     }
 
-    // #[test]
-    // fn result() {
-    //     const PATH: &str = "src/days/day5/input.txt";
-    //     const EXPECTED: &str = "";
-    //     let result = internal_solve(PATH);
-    //     assert_eq!(result, EXPECTED);
-    // }
+    #[test]
+    fn result() {
+        const PATH: &str = "src/days/day5/input.txt";
+        const EXPECTED: &str = "QMBMJDFTD";
+        let result = internal_solve(PATH);
+        assert_eq!(result, EXPECTED);
+    }
 }
