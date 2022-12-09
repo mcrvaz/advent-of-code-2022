@@ -7,12 +7,12 @@ pub fn solve() {
 }
 
 fn internal_solve(path: &str) -> i32 {
-    // const SIZE_LIMIT: i32 = 100000;
+    const SIZE_LIMIT: i32 = 100000;
     let content = read_to_string(path).expect("Fail to read file.");
     let mut fs = FileSystem::new();
     for line in content.lines() {
         if let Some(param) = parse_cd(&line) {
-            fs.execute_cd(param);
+            fs.enter_dir(param);
             continue;
         } else if parse_ls(&line) {
             continue;
@@ -24,13 +24,23 @@ fn internal_solve(path: &str) -> i32 {
             panic!("Invalid command!");
         }
     }
-    -1
+    println!("{}", fs.current_dir);
+
+    fs.dirs
+        .values()
+        .map(|x| x.get_size())
+        .filter(|x| *x < SIZE_LIMIT)
+        .sum()
 }
 
 fn parse_cd(line: &str) -> Option<&str> {
-    let cd_rx = Regex::new(r"$ cd (.*)").unwrap();
-    let captures = cd_rx.captures(line).unwrap();
-    captures.get(1).and_then(|x| Some(x.as_str()))
+    let cd_rx = Regex::new(r"\$ cd (\S+)").unwrap();
+    let captures = cd_rx.captures(line);
+    if let Some(c) = captures {
+        c.get(1).and_then(|x| Some(x.as_str()))
+    } else {
+        None
+    }
 }
 
 fn parse_ls(line: &str) -> bool {
@@ -39,27 +49,33 @@ fn parse_ls(line: &str) -> bool {
 
 fn parse_dir(line: &str) -> Option<Directory> {
     let dir_rx = Regex::new(r"dir (\w)").unwrap();
-    let captures = dir_rx.captures(line).unwrap();
-    captures
-        .get(1)
-        .and_then(|x| Some(x.as_str()))
-        .and_then(|x| Some(Directory::from_name(x)))
+    let captures = dir_rx.captures(line);
+    if let Some(c) = captures {
+        c.get(1)
+            .and_then(|x| Some(x.as_str()))
+            .and_then(|x| Some(Directory::from_name(x)))
+    } else {
+        None
+    }
 }
 
 fn parse_file(line: &str) -> Option<File> {
-    let file_rx = Regex::new(r"({\d}*) ({.*})").unwrap();
-    let captures = file_rx.captures(line).unwrap();
-    let name = captures.get(1).and_then(|x| Some(x.as_str()));
-    let size = captures
-        .get(2)
-        .and_then(|x| Some(x.as_str()))
-        .and_then(|x| Some(x.parse().unwrap()));
-
-    if let (Some(name), Some(size)) = (name, size) {
-        Some(File {
-            name: name.to_string(),
-            size: size,
-        })
+    let file_rx = Regex::new(r"(\d+) (\S+)").unwrap();
+    let captures = file_rx.captures(line);
+    if let Some(c) = captures {
+        let size = c
+            .get(1)
+            .and_then(|x| Some(x.as_str()))
+            .and_then(|x| Some(x.parse().unwrap()));
+        let name = c.get(2).and_then(|x| Some(x.as_str()));
+        if let (Some(size), Some(name)) = (size, name) {
+            Some(File {
+                size: size,
+                name: name.to_string(),
+            })
+        } else {
+            None
+        }
     } else {
         None
     }
@@ -72,52 +88,70 @@ struct FileSystem {
 
 impl FileSystem {
     fn new() -> Self {
-        let name = String::from("/");
-        let root = Directory::from_name(&name);
-        let dirs = HashMap::from_iter(vec![(root.name.to_string(), root)]);
-        FileSystem {
-            dirs: dirs,
-            current_dir: name,
-        }
+        let mut fs = FileSystem {
+            dirs: HashMap::new(),
+            current_dir: String::from(""),
+        };
+        fs.register_dir(Directory::from_name(""));
+        fs
     }
 
-    fn execute_cd(&mut self, param: &str) {
-        self.current_dir = match param {
-            "/" => self.dirs["/"].name.to_string(),
-            ".." => self.get_parent_dir().name.to_string(),
-            dir_name => self.enter_dir(&dir_name).name.to_string(),
-            _ => panic!("Invalid param for cd."),
-        };
+    fn get_dir_name(&self, name: &str) -> String {
+        if name == ".." {
+            let parent_dir = self.get_parent_dir().name.to_string();
+            if parent_dir == "/" {
+                return parent_dir;
+            } else {
+                let mut final_dir = "/".to_string();
+                final_dir.push_str(&parent_dir);
+                return final_dir;
+            }
+        }
+
+        let parent_dir = &self.current_dir;
+        if name == "/" || parent_dir == "/" {
+            let mut dir = parent_dir.to_string();
+            dir.push_str(name);
+            return dir;
+        } else {
+            let mut dir = parent_dir.to_string();
+            dir.push_str("/");
+            dir.push_str(name);
+            return dir;
+        }
     }
 
     fn enter_dir(&mut self, dir_name: &str) -> &Directory {
-        self.current_dir = self.dirs[dir_name].name.to_string();
-        &self.dirs[&self.current_dir]
+        let name = self.get_dir_name(dir_name);
+        println!("{}", name);
+        let d = self.dirs.get(&name).unwrap();
+        self.current_dir = name;
+        d
     }
 
-    fn get_parent_dir(&mut self) -> &Directory {
-        // "/"
-        // "/a"
-        // "/a/b"
-
+    fn get_parent_dir(&self) -> &Directory {
         if self.current_dir == "/" {
             return self.dirs.get(&self.current_dir).unwrap();
         }
-
-        // TODO this is probably wrong
-        let split = self.current_dir.split("/").next().unwrap();
-        return self.dirs.get(split).unwrap();
+        let (parent, _) = self.current_dir.rsplit_once("/").unwrap();
+        if parent.is_empty() {
+            return self.dirs.get("/").unwrap();
+        }
+        return self.dirs.get(parent).unwrap();
     }
 
     fn register_dir(&mut self, dir: Directory) {
         let mut current_dir = self.current_dir.clone();
-        current_dir.push_str("/");
+        if current_dir != "/" {
+            current_dir.push_str("/");
+        }
         current_dir.push_str(&dir.name);
         self.dirs.insert(current_dir, dir);
     }
 
     fn register_file(&mut self, file: File) {
-        let dir = self.dirs.get_mut(&self.current_dir).unwrap();
+        let name = self.current_dir.to_string();
+        let dir = self.dirs.get_mut(&name).unwrap();
         dir.add_file(file);
     }
 }
@@ -142,6 +176,10 @@ impl Directory {
 
     fn add_file(&mut self, file: File) {
         self.files.push(file);
+    }
+
+    fn get_size(&self) -> i32 {
+        self.files.iter().map(|x| x.size).sum()
     }
 }
 
