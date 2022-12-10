@@ -1,5 +1,6 @@
+use lazy_static::lazy_static;
 use regex::Regex;
-use std::{collections::HashMap, fs::read_to_string};
+use std::{cell::RefCell, fs::read_to_string, rc::Rc};
 
 pub fn solve() {
     let result = internal_solve("src/days/day7/input.txt");
@@ -7,35 +8,77 @@ pub fn solve() {
 }
 
 fn internal_solve(path: &str) -> i32 {
-    const SIZE_LIMIT: i32 = 100000;
     let content = read_to_string(path).expect("Fail to read file.");
-    let mut fs = FileSystem::new();
-    for line in content.lines() {
-        if let Some(param) = parse_cd(&line) {
-            fs.enter_dir(param);
-            continue;
-        } else if parse_ls(&line) {
-            continue;
-        } else if let Some(dir) = parse_dir(&line) {
-            fs.register_dir(dir);
-        } else if let Some(file) = parse_file(&line) {
-            fs.register_file(file);
-        } else {
-            panic!("Invalid command!");
+    let tree = parse(&content);
+    let result = get_result(&tree);
+    result
+}
+
+fn get_result(tree: &Tree) -> i32 {
+    let result = get_size_sum(tree.root.clone());
+    result
+}
+
+fn get_size_sum(node_ref: Rc<RefCell<TreeNode>>) -> i32 {
+    const SIZE_LIMIT: i32 = 100000;
+
+    let node = node_ref.borrow();
+    let size = node.get_full_node_size();
+    let mut size_sum = 0;
+    if size <= SIZE_LIMIT {
+        size_sum += size;
+    }
+
+    for c in node.children.iter() {
+        let size = get_size_sum(c.clone());
+        if size <= SIZE_LIMIT {
+            size_sum += size;
         }
     }
-    println!("{}", fs.current_dir);
+    size_sum
+}
 
-    fs.dirs
-        .values()
-        .map(|x| x.get_size())
-        .filter(|x| *x < SIZE_LIMIT)
-        .sum()
+fn parse(content: &str) -> Tree {
+    let tree = Tree::new();
+    {
+        let mut tree_pointer = tree.root.clone();
+        for line in content.lines() {
+            if let Some(param) = parse_cd(&line) {
+                match param {
+                    "/" => {
+                        continue;
+                    }
+                    ".." => {
+                        let parent = tree_pointer.borrow().parent.clone();
+                        tree_pointer = parent.unwrap();
+                    }
+                    p => {
+                        let target = tree_pointer.borrow().find_child(p).unwrap();
+                        tree_pointer = target;
+                    }
+                }
+            } else if parse_ls(&line) {
+                continue;
+            } else if let Some(dir) = parse_dir(&line) {
+                tree_pointer
+                    .borrow_mut()
+                    .add_child(tree_pointer.clone(), &dir.name);
+            } else if let Some(file) = parse_file(&line) {
+                tree_pointer.borrow_mut().increase_value(file.size)
+            } else {
+                panic!("Invalid command!");
+            }
+        }
+    }
+    tree
 }
 
 fn parse_cd(line: &str) -> Option<&str> {
-    let cd_rx = Regex::new(r"\$ cd (\S+)").unwrap();
-    let captures = cd_rx.captures(line);
+    lazy_static! {
+        static ref CD_RX: Regex = Regex::new(r"\$ cd (\S+)").unwrap();
+    }
+
+    let captures = CD_RX.captures(line);
     if let Some(c) = captures {
         c.get(1).and_then(|x| Some(x.as_str()))
     } else {
@@ -48,31 +91,36 @@ fn parse_ls(line: &str) -> bool {
 }
 
 fn parse_dir(line: &str) -> Option<Directory> {
-    let dir_rx = Regex::new(r"dir (\w)").unwrap();
-    let captures = dir_rx.captures(line);
+    lazy_static! {
+        static ref DIR_RX: Regex = Regex::new(r"dir (\S+)").unwrap();
+    }
+
+    let captures = DIR_RX.captures(line);
     if let Some(c) = captures {
-        c.get(1)
-            .and_then(|x| Some(x.as_str()))
-            .and_then(|x| Some(Directory::from_name(x)))
+        c.get(1).and_then(|x| Some(x.as_str())).and_then(|x| {
+            Some(Directory {
+                name: x.to_string(),
+            })
+        })
     } else {
         None
     }
 }
 
 fn parse_file(line: &str) -> Option<File> {
-    let file_rx = Regex::new(r"(\d+) (\S+)").unwrap();
-    let captures = file_rx.captures(line);
+    lazy_static! {
+        static ref FILE_RX: Regex = Regex::new(r"(\d+) (\S+)").unwrap();
+    }
+
+    let captures = FILE_RX.captures(line);
     if let Some(c) = captures {
         let size = c
             .get(1)
             .and_then(|x| Some(x.as_str()))
             .and_then(|x| Some(x.parse().unwrap()));
         let name = c.get(2).and_then(|x| Some(x.as_str()));
-        if let (Some(size), Some(name)) = (size, name) {
-            Some(File {
-                size: size,
-                name: name.to_string(),
-            })
+        if let (Some(size), _) = (size, name) {
+            Some(File { size: size })
         } else {
             None
         }
@@ -81,106 +129,64 @@ fn parse_file(line: &str) -> Option<File> {
     }
 }
 
-struct FileSystem {
-    dirs: HashMap<String, Directory>,
-    current_dir: String,
+struct Tree {
+    root: Rc<RefCell<TreeNode>>,
 }
 
-impl FileSystem {
+struct TreeNode {
+    size: i32,
+    name: String,
+    children: Vec<Rc<RefCell<TreeNode>>>,
+    parent: Option<Rc<RefCell<TreeNode>>>,
+}
+
+impl Tree {
     fn new() -> Self {
-        let mut fs = FileSystem {
-            dirs: HashMap::new(),
-            current_dir: String::from(""),
-        };
-        fs.register_dir(Directory::from_name(""));
-        fs
+        let root = Rc::new(RefCell::new(TreeNode {
+            size: 0,
+            parent: None,
+            name: String::from("/"),
+            children: Vec::new(),
+        }));
+        Tree { root: root }
+    }
+}
+
+impl TreeNode {
+    fn add_child(&mut self, parent: Rc<RefCell<TreeNode>>, name: &str) {
+        let node = Rc::new(RefCell::new(TreeNode {
+            size: 0,
+            name: name.to_string(),
+            parent: Some(parent),
+            children: Vec::new(),
+        }));
+        self.children.push(node);
     }
 
-    fn get_dir_name(&self, name: &str) -> String {
-        if name == ".." {
-            let parent_dir = self.get_parent_dir().name.to_string();
-            if parent_dir == "/" {
-                return parent_dir;
-            } else {
-                let mut final_dir = "/".to_string();
-                final_dir.push_str(&parent_dir);
-                return final_dir;
-            }
-        }
-
-        let parent_dir = &self.current_dir;
-        if name == "/" || parent_dir == "/" {
-            let mut dir = parent_dir.to_string();
-            dir.push_str(name);
-            return dir;
-        } else {
-            let mut dir = parent_dir.to_string();
-            dir.push_str("/");
-            dir.push_str(name);
-            return dir;
-        }
+    fn find_child(&self, name: &str) -> Option<Rc<RefCell<TreeNode>>> {
+        let target = self.children.iter().find(|x| x.borrow().name == name);
+        target.map(|x| x.clone())
     }
 
-    fn enter_dir(&mut self, dir_name: &str) -> &Directory {
-        let name = self.get_dir_name(dir_name);
-        println!("{}", name);
-        let d = self.dirs.get(&name).unwrap();
-        self.current_dir = name;
-        d
+    fn increase_value(&mut self, incr: i32) {
+        self.size += incr;
     }
 
-    fn get_parent_dir(&self) -> &Directory {
-        if self.current_dir == "/" {
-            return self.dirs.get(&self.current_dir).unwrap();
+    fn get_full_node_size(&self) -> i32 {
+        let mut size_sum = self.size;
+        for c in self.children.iter() {
+            size_sum += c.borrow().get_full_node_size();
         }
-        let (parent, _) = self.current_dir.rsplit_once("/").unwrap();
-        if parent.is_empty() {
-            return self.dirs.get("/").unwrap();
-        }
-        return self.dirs.get(parent).unwrap();
-    }
-
-    fn register_dir(&mut self, dir: Directory) {
-        let mut current_dir = self.current_dir.clone();
-        if current_dir != "/" {
-            current_dir.push_str("/");
-        }
-        current_dir.push_str(&dir.name);
-        self.dirs.insert(current_dir, dir);
-    }
-
-    fn register_file(&mut self, file: File) {
-        let name = self.current_dir.to_string();
-        let dir = self.dirs.get_mut(&name).unwrap();
-        dir.add_file(file);
+        size_sum
     }
 }
 
 struct File {
-    pub name: String,
-    pub size: i32,
+    size: i32,
 }
 
 struct Directory {
-    pub name: String,
-    pub files: Vec<File>,
-}
-
-impl Directory {
-    fn from_name(name: &str) -> Self {
-        Directory {
-            name: name.to_string(),
-            files: Vec::new(),
-        }
-    }
-
-    fn add_file(&mut self, file: File) {
-        self.files.push(file);
-    }
-
-    fn get_size(&self) -> i32 {
-        self.files.iter().map(|x| x.size).sum()
-    }
+    name: String,
 }
 
 #[cfg(test)]
@@ -195,11 +201,12 @@ mod tests {
         assert_eq!(result, EXPECTED);
     }
 
-    // #[test]
-    // fn result() {
-    //     const PATH: &str = "src/days/day5/input.txt";
-    //     const EXPECTED: &str = "QMBMJDFTD";
-    //     let result = internal_solve(PATH);
-    //     assert_eq!(result, EXPECTED);
-    // }
+    #[test]
+    fn result() {
+        const PATH: &str = "src/days/day7/input.txt";
+        // 29178 too low
+        const EXPECTED: i32 = -1;
+        let result = internal_solve(PATH);
+        assert_eq!(result, EXPECTED);
+    }
 }
