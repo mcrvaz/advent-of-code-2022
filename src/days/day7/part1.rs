@@ -15,19 +15,18 @@ fn internal_solve(path: &str) -> i32 {
 
 fn get_size_sum(node_ref: Rc<RefCell<TreeNode>>) -> i32 {
     const SIZE_LIMIT: i32 = 100000;
-
     let node = node_ref.borrow();
-    let mut size_sum = 0;
-
     let size = node.size;
+    let children_sum = node
+        .children
+        .iter()
+        .map(|x| get_size_sum(x.clone()))
+        .sum::<i32>();
     if size <= SIZE_LIMIT {
-        size_sum += size;
+        size + children_sum
+    } else {
+        children_sum
     }
-
-    for c in node.children.iter() {
-        size_sum += get_size_sum(c.clone());
-    }
-    size_sum
 }
 
 fn parse(content: &str) -> Tree {
@@ -70,12 +69,10 @@ fn parse_cd(line: &str) -> Option<&str> {
         static ref CD_RX: Regex = Regex::new(r"\$ cd (\S+)").unwrap();
     }
 
-    let captures = CD_RX.captures(line);
-    if let Some(c) = captures {
-        c.get(1).and_then(|x| Some(x.as_str()))
-    } else {
-        None
+    if let Some(c) = CD_RX.captures(line) {
+        return c.get(1).and_then(|x| Some(x.as_str()));
     }
+    None
 }
 
 fn parse_ls(line: &str) -> bool {
@@ -87,16 +84,14 @@ fn parse_dir(line: &str) -> Option<Directory> {
         static ref DIR_RX: Regex = Regex::new(r"dir (\S+)").unwrap();
     }
 
-    let captures = DIR_RX.captures(line);
-    if let Some(c) = captures {
-        c.get(1).and_then(|x| Some(x.as_str())).and_then(|x| {
+    if let Some(c) = DIR_RX.captures(line) {
+        return c.get(1).and_then(|x| Some(x.as_str())).and_then(|x| {
             Some(Directory {
                 name: x.to_string(),
             })
-        })
-    } else {
-        None
+        });
     }
+    None
 }
 
 fn parse_file(line: &str) -> Option<File> {
@@ -104,21 +99,17 @@ fn parse_file(line: &str) -> Option<File> {
         static ref FILE_RX: Regex = Regex::new(r"(\d+) (\S+)").unwrap();
     }
 
-    let captures = FILE_RX.captures(line);
-    if let Some(c) = captures {
+    if let Some(c) = FILE_RX.captures(line) {
         let size = c
             .get(1)
             .and_then(|x| Some(x.as_str()))
             .and_then(|x| Some(x.parse().unwrap()));
         let name = c.get(2).and_then(|x| Some(x.as_str()));
         if let (Some(size), _) = (size, name) {
-            Some(File { size: size })
-        } else {
-            None
+            return Some(File { size });
         }
-    } else {
-        None
     }
+    None
 }
 
 struct Tree {
