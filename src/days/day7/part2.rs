@@ -1,104 +1,184 @@
+use lazy_static::lazy_static;
 use regex::Regex;
-use std::{
-    collections::{BTreeMap, VecDeque},
-    fmt,
-    fs::read_to_string,
-    str::Lines,
-};
+use std::{cell::RefCell, fs::read_to_string, rc::Rc};
 
 pub fn solve() {
-    let result = internal_solve("src/days/day5/input.txt");
+    let result = internal_solve("src/days/day7/input.txt");
     println!("Result: {}", result);
 }
 
-struct Instruction {
-    pub orig: usize,
-    pub dst: usize,
-    pub count: usize,
-}
-
-impl fmt::Debug for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "move {} from {} to {}", self.count, self.orig, self.dst)
-    }
-}
-
-fn internal_solve(path: &str) -> String {
+fn internal_solve(path: &str) -> i32 {
     let content = read_to_string(path).expect("Fail to read file.");
-    let mut line_iter = content.lines();
-    let mut stacks = parse_stacks(&mut line_iter);
-    let instructions: Vec<Instruction> = line_iter.map(|x| parse_instruction(x)).collect();
-    for inst in instructions {
-        execute_instruction(&mut stacks, inst)
-    }
-
-    stacks
-        .values()
-        .map(|x| x.clone().pop_back().unwrap())
-        .collect::<String>()
+    let tree = parse(&content);
+    get_result(tree.root.clone())
 }
 
-fn parse_stacks(line_iter: &mut Lines) -> BTreeMap<usize, VecDeque<char>> {
-    const SPACING: usize = 1;
-    const ELEMENT_SIZE: usize = 3;
-    const RADIX: u32 = 10;
+fn get_result(root_ref: Rc<RefCell<TreeNode>>) -> i32 {
+    const TOTAL_SIZE: i32 = 70000000;
+    const TARGET_SIZE: i32 = 30000000;
+    let root = root_ref.borrow();
+    let available_space = TOTAL_SIZE - root.size;
+    let space_needed = TARGET_SIZE - available_space;
 
-    let mut result: BTreeMap<usize, VecDeque<char>> = BTreeMap::new();
-
-    loop {
-        if let Some(line) = line_iter.next() {
-            let mut chars = line.chars();
-            let mut i = 0;
-            while let Some(c) = chars.next() {
-                i += 1;
-                if c.is_whitespace() {
-                    continue;
-                }
-                if c.is_digit(RADIX) {
-                    line_iter.next();
-                    return result;
-                }
-
-                if c == '[' {
-                    let value = chars.next().unwrap();
-                    i += 1;
-                    let stack_number = ((i as usize) / (SPACING + ELEMENT_SIZE)) + 1;
-                    if result.contains_key(&stack_number) {
-                        result
-                            .get_mut(&stack_number)
-                            .and_then(|x| Some(x.push_front(value)));
-                    } else {
-                        let mut vec = VecDeque::new();
-                        vec.push_front(value);
-                        result.insert(stack_number, vec);
-                    }
-                    _ = chars.next();
-                    i += 1;
-                }
-            }
+    let mut sizes = Vec::new();
+    get_sizes(root_ref.clone(), &mut sizes);
+    fn get_sizes(root_ref: Rc<RefCell<TreeNode>>, vec: &mut Vec<i32>) {
+        let node = root_ref.borrow();
+        vec.push(node.size);
+        for c in root_ref.borrow().children.iter() {
+            get_sizes(c.clone(), vec);
         }
     }
+
+    sizes
+        .iter()
+        .filter(|x| **x >= space_needed)
+        .min()
+        .map(|x| *x)
+        .unwrap()
 }
 
-fn parse_instruction(line: &str) -> Instruction {
-    let rx = Regex::new(r"move (\d+) from (\d+) to (\d+)").unwrap();
-    let captures = rx.captures(line).unwrap();
-    Instruction {
-        dst: captures.get(3).unwrap().as_str().parse().unwrap(),
-        orig: captures.get(2).unwrap().as_str().parse().unwrap(),
-        count: captures.get(1).unwrap().as_str().parse().unwrap(),
+fn parse(content: &str) -> Tree {
+    let tree = Tree::new();
+    let mut tree_pointer = tree.root.clone();
+    for line in content.lines() {
+        if let Some(param) = parse_cd(&line) {
+            match param {
+                "/" => {
+                    continue;
+                }
+                ".." => {
+                    move_to_upper_dir(&mut tree_pointer);
+                }
+                p => {
+                    let target = tree_pointer.borrow().find_child(p).unwrap();
+                    tree_pointer = target;
+                }
+            }
+        } else if parse_ls(&line) {
+            continue;
+        } else if let Some(dir) = parse_dir(&line) {
+            tree_pointer
+                .borrow_mut()
+                .add_child(tree_pointer.clone(), &dir.name);
+        } else if let Some(file) = parse_file(&line) {
+            tree_pointer.borrow_mut().increase_size(file.size)
+        } else {
+            panic!("Invalid command!");
+        }
+    }
+
+    while tree_pointer.borrow().parent.is_some() {
+        move_to_upper_dir(&mut tree_pointer);
+    }
+    tree
+}
+
+fn move_to_upper_dir(tree_pointer: &mut Rc<RefCell<TreeNode>>) {
+    let current_size = tree_pointer.borrow().size.clone();
+    let parent = tree_pointer.borrow().parent.clone().unwrap();
+    parent.borrow_mut().increase_size(current_size);
+    *tree_pointer = parent;
+}
+
+fn parse_cd(line: &str) -> Option<&str> {
+    lazy_static! {
+        static ref CD_RX: Regex = Regex::new(r"\$ cd (\S+)").unwrap();
+    }
+
+    if let Some(c) = CD_RX.captures(line) {
+        return c.get(1).and_then(|x| Some(x.as_str()));
+    }
+    None
+}
+
+fn parse_ls(line: &str) -> bool {
+    line == "$ ls"
+}
+
+fn parse_dir(line: &str) -> Option<Directory> {
+    lazy_static! {
+        static ref DIR_RX: Regex = Regex::new(r"dir (\S+)").unwrap();
+    }
+
+    if let Some(c) = DIR_RX.captures(line) {
+        return c.get(1).and_then(|x| Some(x.as_str())).and_then(|x| {
+            Some(Directory {
+                name: x.to_string(),
+            })
+        });
+    }
+    None
+}
+
+fn parse_file(line: &str) -> Option<File> {
+    lazy_static! {
+        static ref FILE_RX: Regex = Regex::new(r"(\d+) (\S+)").unwrap();
+    }
+
+    if let Some(c) = FILE_RX.captures(line) {
+        let size = c
+            .get(1)
+            .and_then(|x| Some(x.as_str()))
+            .and_then(|x| Some(x.parse().unwrap()));
+        let name = c.get(2).and_then(|x| Some(x.as_str()));
+        if let (Some(size), _) = (size, name) {
+            return Some(File { size });
+        }
+    }
+    None
+}
+
+struct Tree {
+    root: Rc<RefCell<TreeNode>>,
+}
+
+struct TreeNode {
+    size: i32,
+    name: String,
+    children: Vec<Rc<RefCell<TreeNode>>>,
+    parent: Option<Rc<RefCell<TreeNode>>>,
+}
+
+impl Tree {
+    fn new() -> Self {
+        let root = Rc::new(RefCell::new(TreeNode {
+            size: 0,
+            parent: None,
+            name: String::from("/"),
+            children: Vec::new(),
+        }));
+        Tree { root }
     }
 }
 
-fn execute_instruction(stacks: &mut BTreeMap<usize, VecDeque<char>>, inst: Instruction) {
-    let mut values: VecDeque<char> = VecDeque::with_capacity(inst.count);
-    for _ in 0..inst.count {
-        let value = stacks.get_mut(&inst.orig).unwrap().pop_back().unwrap();
-        values.push_front(value);
+impl TreeNode {
+    fn add_child(&mut self, parent: Rc<RefCell<TreeNode>>, name: &str) {
+        let node = Rc::new(RefCell::new(TreeNode {
+            size: 0,
+            name: name.to_string(),
+            parent: Some(parent),
+            children: Vec::new(),
+        }));
+        self.children.push(node);
     }
-    for v in values {
-        stacks.get_mut(&inst.dst).unwrap().push_back(v);
+
+    fn find_child(&self, name: &str) -> Option<Rc<RefCell<TreeNode>>> {
+        let target = self.children.iter().find(|x| x.borrow().name == name);
+        target.map(|x| x.clone())
     }
+
+    fn increase_size(&mut self, incr: i32) {
+        self.size += incr;
+    }
+}
+
+struct File {
+    size: i32,
+}
+
+struct Directory {
+    name: String,
 }
 
 #[cfg(test)]
@@ -107,16 +187,17 @@ mod tests {
 
     #[test]
     fn sample() {
-        const PATH: &str = "src/days/day5/test-input.txt";
-        const EXPECTED: &str = "MCD";
+        const PATH: &str = "src/days/day7/test-input.txt";
+        const EXPECTED: i32 = 24933642;
         let result = internal_solve(PATH);
         assert_eq!(result, EXPECTED);
     }
 
     #[test]
     fn result() {
-        const PATH: &str = "src/days/day5/input.txt";
-        const EXPECTED: &str = "NBTVTJNFJ";
+        println!("my version");
+        const PATH: &str = "src/days/day7/input.txt";
+        const EXPECTED: i32 = 3636703;
         let result = internal_solve(PATH);
         assert_eq!(result, EXPECTED);
     }
