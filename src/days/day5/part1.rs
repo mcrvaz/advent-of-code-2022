@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -81,8 +82,10 @@ fn parse_stacks(line_iter: &mut Lines) -> BTreeMap<usize, VecDeque<char>> {
 }
 
 fn parse_instruction(line: &str) -> Instruction {
-    let rx = Regex::new(r"move (\d+) from (\d+) to (\d+)").unwrap();
-    let captures = rx.captures(line).unwrap();
+    lazy_static! {
+        static ref RX: Regex = Regex::new(r"move (\d+) from (\d+) to (\d+)").unwrap();
+    }
+    let captures = RX.captures(line).unwrap();
     Instruction {
         dst: captures.get(3).unwrap().as_str().parse().unwrap(),
         orig: captures.get(2).unwrap().as_str().parse().unwrap(),
