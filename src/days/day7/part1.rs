@@ -10,64 +10,56 @@ pub fn solve() {
 fn internal_solve(path: &str) -> i32 {
     let content = read_to_string(path).expect("Fail to read file.");
     let tree = parse(&content);
-    let result = get_result(&tree);
-    result
-}
-
-fn get_result(tree: &Tree) -> i32 {
-    let result = get_size_sum(tree.root.clone());
-    result
+    get_size_sum(tree.root.clone())
 }
 
 fn get_size_sum(node_ref: Rc<RefCell<TreeNode>>) -> i32 {
     const SIZE_LIMIT: i32 = 100000;
 
     let node = node_ref.borrow();
-    let size = node.get_full_node_size();
     let mut size_sum = 0;
+
+    let size = node.size;
     if size <= SIZE_LIMIT {
         size_sum += size;
     }
 
     for c in node.children.iter() {
-        let size = get_size_sum(c.clone());
-        if size <= SIZE_LIMIT {
-            size_sum += size;
-        }
+        size_sum += get_size_sum(c.clone());
     }
     size_sum
 }
 
 fn parse(content: &str) -> Tree {
     let tree = Tree::new();
-    {
-        let mut tree_pointer = tree.root.clone();
-        for line in content.lines() {
-            if let Some(param) = parse_cd(&line) {
-                match param {
-                    "/" => {
-                        continue;
-                    }
-                    ".." => {
-                        let parent = tree_pointer.borrow().parent.clone();
-                        tree_pointer = parent.unwrap();
-                    }
-                    p => {
-                        let target = tree_pointer.borrow().find_child(p).unwrap();
-                        tree_pointer = target;
-                    }
+    let mut tree_pointer = tree.root.clone();
+    for line in content.lines() {
+        if let Some(param) = parse_cd(&line) {
+            match param {
+                "/" => {
+                    continue;
                 }
-            } else if parse_ls(&line) {
-                continue;
-            } else if let Some(dir) = parse_dir(&line) {
-                tree_pointer
-                    .borrow_mut()
-                    .add_child(tree_pointer.clone(), &dir.name);
-            } else if let Some(file) = parse_file(&line) {
-                tree_pointer.borrow_mut().increase_value(file.size)
-            } else {
-                panic!("Invalid command!");
+                ".." => {
+                    let current_size = tree_pointer.borrow().size;
+                    let parent = tree_pointer.borrow().parent.clone();
+                    tree_pointer = parent.unwrap();
+                    tree_pointer.borrow_mut().increase_size(current_size);
+                }
+                p => {
+                    let target = tree_pointer.borrow().find_child(p).unwrap();
+                    tree_pointer = target;
+                }
             }
+        } else if parse_ls(&line) {
+            continue;
+        } else if let Some(dir) = parse_dir(&line) {
+            tree_pointer
+                .borrow_mut()
+                .add_child(tree_pointer.clone(), &dir.name);
+        } else if let Some(file) = parse_file(&line) {
+            tree_pointer.borrow_mut().increase_size(file.size)
+        } else {
+            panic!("Invalid command!");
         }
     }
     tree
@@ -148,7 +140,7 @@ impl Tree {
             name: String::from("/"),
             children: Vec::new(),
         }));
-        Tree { root: root }
+        Tree { root }
     }
 }
 
@@ -168,16 +160,8 @@ impl TreeNode {
         target.map(|x| x.clone())
     }
 
-    fn increase_value(&mut self, incr: i32) {
+    fn increase_size(&mut self, incr: i32) {
         self.size += incr;
-    }
-
-    fn get_full_node_size(&self) -> i32 {
-        let mut size_sum = self.size;
-        for c in self.children.iter() {
-            size_sum += c.borrow().get_full_node_size();
-        }
-        size_sum
     }
 }
 
@@ -204,8 +188,7 @@ mod tests {
     #[test]
     fn result() {
         const PATH: &str = "src/days/day7/input.txt";
-        // 29178 too low
-        const EXPECTED: i32 = -1;
+        const EXPECTED: i32 = 1845346;
         let result = internal_solve(PATH);
         assert_eq!(result, EXPECTED);
     }
