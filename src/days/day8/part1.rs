@@ -43,7 +43,7 @@ fn is_visible(row: usize, col: usize, trees: &Vec<Vec<u32>>) -> bool {
 
 fn is_visible_from_top(row: usize, col: usize, trees: &Vec<Vec<u32>>) -> bool {
     let value = trees[row][col];
-    for i in 0..row {
+    for i in (0..row).rev() {
         let current = trees[i][col];
         if current >= value {
             return false;
@@ -66,7 +66,7 @@ fn is_visible_from_bot(row: usize, col: usize, trees: &Vec<Vec<u32>>) -> bool {
 
 fn is_visible_from_left(row: usize, col: usize, trees: &Vec<Vec<u32>>) -> bool {
     let value = trees[row][col];
-    for i in 0..col {
+    for i in (0..col).rev() {
         let current = trees[row][i];
         if current >= value {
             return false;
