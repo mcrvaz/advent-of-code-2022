@@ -50,6 +50,11 @@ fn main() {
             2 => days::day8::part2::solve(),
             _ => panic!("Invalid part number."),
         },
+        9 => match part_number {
+            1 => days::day9::part1::solve(),
+            2 => days::day9::part2::solve(),
+            _ => panic!("Invalid part number."),
+        },
         _ => panic!("Invalid day number."),
     }
 }
