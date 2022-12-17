@@ -1,60 +1,40 @@
-use std::env;
+use paste::paste;
+use seq_macro::seq;
+use std::{collections::HashMap, env};
 
 mod days;
 mod utils;
 
 fn main() {
-    let day = env::args().nth(1).expect("Day number not provided.");
-    let part = env::args().nth(2).expect("Part number not provided.");
-    let day_number = day.parse::<i32>().unwrap();
-    let part_number = part.parse::<i32>().unwrap();
-
-    match day_number {
-        1 => match part_number {
-            1 => days::day1::part1::solve(),
-            2 => days::day1::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        2 => match part_number {
-            1 => days::day2::part1::solve(),
-            2 => days::day2::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        3 => match part_number {
-            1 => days::day3::part1::solve(),
-            2 => days::day3::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        4 => match part_number {
-            1 => days::day4::part1::solve(),
-            2 => days::day4::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        5 => match part_number {
-            1 => days::day5::part1::solve(),
-            2 => days::day5::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        6 => match part_number {
-            1 => days::day6::part1::solve(),
-            2 => days::day6::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        7 => match part_number {
-            1 => days::day7::part1::solve(),
-            2 => days::day7::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        8 => match part_number {
-            1 => days::day8::part1::solve(),
-            2 => days::day8::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        9 => match part_number {
-            1 => days::day9::part1::solve(),
-            2 => days::day9::part2::solve(),
-            _ => panic!("Invalid part number."),
-        },
-        _ => panic!("Invalid day number."),
+    macro_rules! day_part_fn {
+        ($day_number:literal, $part_number:literal) => {
+            paste! {
+                days::[<day$day_number>]::[<part$part_number>]::solve as fn()
+            }
+        };
     }
+
+    macro_rules! day_solver {
+        ($day_number:literal) => {
+            HashMap::from_iter([
+                (1, day_part_fn!($day_number, 1)),
+                (2, day_part_fn!($day_number, 2)),
+            ])
+        };
+    }
+
+    let day_number = env::args()
+        .nth(1)
+        .map(|x| x.parse().unwrap())
+        .expect("Invalid day number.");
+    let part_number = env::args()
+        .nth(2)
+        .map(|x| x.parse().unwrap())
+        .expect("Invalid part number.");
+
+    let mut solvers: HashMap<i32, HashMap<i32, fn()>> = HashMap::new();
+    seq!(N in 1..=10 {
+        solvers.insert(N, day_solver!(N));
+    });
+    solvers[&day_number][&part_number]();
 }

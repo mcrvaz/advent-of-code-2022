@@ -1,9 +1,11 @@
-pub mod day1;
-pub mod day2;
-pub mod day3;
-pub mod day4;
-pub mod day5;
-pub mod day6;
-pub mod day7;
-pub mod day8;
-pub mod day9;
+use paste::paste;
+use seq_macro::seq;
+
+macro_rules! mod_day {
+    ($number:literal) => {
+        paste! { pub mod [<day$number>]; }
+    };
+}
+seq!(N in 1..=10 {
+    mod_day!(N);
+});
