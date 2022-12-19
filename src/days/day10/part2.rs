@@ -20,15 +20,15 @@ fn internal_solve(path: &str) -> String {
     let mut cycle = 1;
     let mut register = 1;
     for line in content.lines() {
+        draw_sprite(cycle, register, &mut grid);
         if let Some(x) = parse_addx(line) {
             cycle += 1;
-            draw_sprite(register, &mut grid);
+            draw_sprite(cycle, register, &mut grid);
             cycle += 1;
             register += x;
         } else {
             cycle += 1;
         }
-        draw_sprite(register, &mut grid);
     }
 
     for i in 0..HEIGHT {
@@ -41,14 +41,30 @@ fn internal_solve(path: &str) -> String {
     grid.concat().concat()
 }
 
-fn draw_sprite(register: i32, grid: &mut [[&str; WIDTH]; HEIGHT]) {
-    let row = (register as usize / HEIGHT) % HEIGHT;
-    let col = register as usize % WIDTH;
-    if row == 6 {
-        println!("ayy");
+fn draw_sprite(cycle: i32, register: i32, grid: &mut [[&str; WIDTH]; HEIGHT]) {
+    let (c_row, c_col) = get_row_col(cycle as usize);
+    println!("cycle row {} cycle col {}", c_row, c_col);
+    // println!(
+    //     "register row {} register col {}",
+    //     register_row, register_col
+    // );
+
+    let mut visible = false;
+    for r in register..register + 2 {
+        let (r_row, r_col) = get_row_col(r as usize);
+        if c_row == r_row && c_col == r_col {
+            visible = true;
+        }
     }
-    // println!("row {} col {}", row, col);
-    grid[row][col] = "#";
+
+    if visible {
+        println!("draw");
+        grid[c_row][c_col] = "#";
+    }
+}
+
+fn get_row_col(idx: usize) -> (usize, usize) {
+    (idx / WIDTH, idx % WIDTH)
 }
 
 fn parse_addx(line: &str) -> Option<i32> {
