@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::read_to_string};
 
 pub fn solve() {
-    let result = internal_solve("src/days/day9/input.txt");
+    let result = internal_solve("src/days/day10/input.txt");
     println!("Result: {}", result);
 }
 

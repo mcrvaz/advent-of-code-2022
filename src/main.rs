@@ -33,7 +33,7 @@ fn main() {
         .expect("Invalid part number.");
 
     let mut solvers: HashMap<i32, HashMap<i32, fn()>> = HashMap::new();
-    seq!(N in 1..=10 {
+    seq!(N in 1..=11 {
         solvers.insert(N, day_solver!(N));
     });
     solvers[&day_number][&part_number]();
