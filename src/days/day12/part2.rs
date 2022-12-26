@@ -82,20 +82,6 @@ struct Graph {
 }
 
 impl Graph {
-    fn print(&self) {
-        let height = self.nodes.len();
-        let width = self.nodes[0].len();
-        for i in 0..height {
-            for j in 0..width {
-                print!(
-                    "{}",
-                    char::from_u32(self.nodes[i][j].borrow().weight).unwrap()
-                );
-            }
-            println!();
-        }
-    }
-
     fn get_start_nodes(&self) -> Vec<Rc<RefCell<Node>>> {
         let height = self.nodes.len();
         let width = self.nodes[0].len();
