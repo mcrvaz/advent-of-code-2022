@@ -6,6 +6,6 @@ macro_rules! mod_day {
         paste! { pub mod [<day$number>]; }
     };
 }
-seq!(N in 1..=12 {
+seq!(N in 1..=13 {
     mod_day!(N);
 });
