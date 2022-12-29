@@ -1,4 +1,6 @@
 use std::{
+    cmp::Ordering,
+    fmt::Display,
     fs::read_to_string,
     str::{Chars, Lines},
 };
@@ -13,16 +15,17 @@ fn internal_solve(path: &str) -> i32 {
     let mut iter = content.lines();
     let mut packets = Vec::new();
     while let Some((p1, p2)) = parse_packet_pair(&mut iter) {
-        p1.value.print();
-        println!();
-        p2.value.print();
-        println!();
-
-        packets.push(p1);
-        packets.push(p2);
+        packets.push((p1, p2));
         _ = iter.next();
     }
-    1
+
+    let mut sorted = Vec::new();
+    for (i, (p1, p2)) in packets.iter().enumerate() {
+        if p1.cmp(&p2) == Ordering::Less {
+            sorted.push(i + 1);
+        }
+    }
+    sorted.iter().sum::<usize>() as i32
 }
 
 fn parse_packet_pair(iter: &mut Lines) -> Option<(Packet, Packet)> {
@@ -35,13 +38,11 @@ fn parse_packet_pair(iter: &mut Lines) -> Option<(Packet, Packet)> {
 }
 
 fn parse_packet(line: &str) -> Packet {
-    let mut result = PacketValue::None;
-    result.push(parse_value(&mut line.chars()));
-    Packet { value: result }
+    parse_value(&mut line.chars()).pop().unwrap()
 }
 
-fn parse_value(iter: &mut Chars) -> PacketValue {
-    let mut result = PacketValue::List(Vec::new());
+fn parse_value(iter: &mut Chars) -> Packet {
+    let mut result = Packet::List(Vec::new());
     let mut current_number: Option<String> = None;
     while let Some(c) = iter.next() {
         if c == ',' {
@@ -65,52 +66,67 @@ fn parse_value(iter: &mut Chars) -> PacketValue {
     result
 }
 
-struct Packet {
-    value: PacketValue,
-}
-
-enum PacketValue {
-    None,
-    List(Vec<PacketValue>),
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
+enum Packet {
+    List(Vec<Packet>),
     Value(u32),
 }
 
-impl PacketValue {
-    fn print(&self) {
+impl Ord for Packet {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Packet::List(l1), Packet::List(l2)) => l1.cmp(l2),
+            (Packet::List(l1), Packet::Value(v2)) => l1.cmp(&vec![Packet::Value(*v2)]),
+            (Packet::Value(v1), Packet::List(l2)) => vec![Packet::Value(*v1)].cmp(&l2),
+            (Packet::Value(v1), Packet::Value(v2)) => v1.cmp(v2),
+        }
+    }
+}
+
+impl Display for Packet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PacketValue::List(l1) => {
-                print!("[");
+            Packet::List(l1) => {
+                let mut result = String::new();
                 for l in l1 {
-                    l.print();
+                    let str = l.to_string();
+                    result.push_str(&str);
+                    result.push(',')
                 }
-                print!("]");
+                if let Some(r) = result.pop() {
+                    if r != ',' {
+                        result.push(r);
+                    }
+                }
+                write!(f, "[{result}]")
             }
-            PacketValue::Value(v) => print!("{v},"),
-            _ => {}
+            Packet::Value(v) => write!(f, "{v}"),
+        }
+    }
+}
+
+impl Packet {
+    fn push(&mut self, other: Self) {
+        match self {
+            Packet::List(l1) => l1.push(other),
+            Packet::Value(_) => panic!("Trying to push to value!"),
         };
     }
 
-    fn push(&mut self, other: Self) {
+    fn pop(&mut self) -> Option<Packet> {
         match self {
-            PacketValue::List(l1) => l1.push(other),
-            _ => panic!("Trying to push to value!"),
-        };
-    }
-    fn pop(&mut self) -> Option<PacketValue> {
-        match self {
-            PacketValue::List(l) => l.pop(),
-            _ => panic!("Trying to pop from value!"),
+            Packet::List(l) => l.pop(),
+            Packet::Value(_) => panic!("Trying to pop from value!"),
         }
     }
+
     fn try_add_value(&mut self, number: Option<String>) {
         if let Some(n) = number {
-            let mut current = self.pop().unwrap();
             let num = n.parse::<u32>().unwrap();
-            match current {
-                PacketValue::List(ref mut l) => l.push(PacketValue::Value(num)),
+            match self {
+                Packet::List(l) => l.push(Packet::Value(num)),
                 _ => {}
             };
-            self.push(current);
         }
     }
 }
@@ -130,7 +146,7 @@ mod tests {
     #[test]
     fn result() {
         const PATH: &str = "src/days/day13/input.txt";
-        const EXPECTED: i32 = -1;
+        const EXPECTED: i32 = 5390;
         let result = internal_solve(PATH);
         assert_eq!(result, EXPECTED);
     }
